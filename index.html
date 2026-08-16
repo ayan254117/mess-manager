@@ -323,7 +323,6 @@
 </div>
 
 <script>
-// Supabase Initialization Fix
 const SUPABASE_URL = 'https://tnkauduohjafnezlojtc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRua2F1ZHVvaGphZm5lemxvanRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4Mjk4NjMsImV4cCI6MjEwMjQwNTg2M30.4Ii96NvRWYDkISroXCOHmrBU3JjaVBnchR1Mg0B6PPU';
 const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -420,7 +419,7 @@ function statCard(html){ return `<div class="bg-gray-50 border rounded-2xl p-4 t
 function renderStats(){
   document.getElementById('dashStats').innerHTML =
     statCard(`<p class="text-xs text-gray-500 font-medium">মোট মিল</p><b class="text-xl md:text-2xl text-emerald-600">${totalMeals(viewMonth)}</b>`) +
-    statCard(`<p class="text-xs text-gray-500 font-medium font-medium">মোট খরচ</p><b class="text-xl md:text-2xl text-amber-600">${fmt(totalBazaar(viewMonth))} ৳</b>`) +
+    statCard(`<p class="text-xs text-gray-500 font-medium">মোট খরচ</p><b class="text-xl md:text-2xl text-amber-600">${fmt(totalBazaar(viewMonth))} ৳</b>`) +
     statCard(`<p class="text-xs text-gray-500 font-medium">মিল রেট</p><b class="text-xl md:text-2xl text-blue-600">${fmt(rate(viewMonth))} ৳</b>`) +
     statCard(`<p class="text-xs text-gray-500 font-medium">সদস্য</p><b class="text-xl md:text-2xl text-purple-600">${DB.users.length}</b>`);
 }
@@ -513,8 +512,8 @@ function renderMemberDash(){
   document.getElementById('mTotalMeals').textContent = totalMeals(activeMonth);
   document.getElementById('mTotalBazaar').textContent = fmt(totalBazaar(activeMonth)) + ' ৳';
   document.getElementById('mMealRate').textContent = fmt(rate(activeMonth)) + ' ৳';
-  document.getElementById('mMyMeals').textContent = userMeals(profile.id, activeMonth);
-  document.getElementById('mMyDeposit').textContent = fmt(depositFor(profile.id, activeMonth)) + ' ৳';
+  document.getElementById('mMyMeals').textContent = profile ? userMeals(profile.id, activeMonth) : 0;
+  document.getElementById('mMyDeposit').textContent = profile ? fmt(depositFor(profile.id, activeMonth)) + ' ৳' : '0.00 ৳';
 }
 
 function renderItemDropdown(){
@@ -531,6 +530,7 @@ function updateAutoTotal(){
 }
 
 function renderMyRequests(){
+  if(!profile) return;
   const mine = DB.requests.filter(r=>r.user_id===profile.id);
   const el = document.getElementById('myRequestsList');
   if(!mine.length){ el.innerHTML='<p class="text-gray-400 text-sm">কোনো রিকোয়েস্ট জমা নেই</p>'; return; }
@@ -564,7 +564,7 @@ async function handleSignup(){
   const pass=document.getElementById('suPass').value;
   if(!name||!email||pass.length<6) return swalErr('সঠিক নাম, ইমেইল এবং ন্যূনতম ৬ অক্ষরের পাসওয়ার্ড দিন!');
   
-  const {error} = await sbClient.auth.signUp({ email, password:pass, options:{ data:{ name } } });
+  const {data, error} = await sbClient.auth.signUp({ email, password:pass, options:{ data:{ name } } });
   if(error) return swalErr(error.message);
   
   swalOk('অ্যাকাউন্ট তৈরি সফল হয়েছে!');
@@ -664,6 +664,7 @@ async function startNewMonth(){
 
 /* ---------- সদস্য অ্যাকশন ---------- */
 async function submitMealRequest(){
+  if(!profile) return;
   const date=document.getElementById('rmDate').value, action=document.getElementById('rmAction').value, count=parseFloat(document.getElementById('rmCount').value);
   if(!date||!count||count<=0) return swalErr('তারিখ ও সঠিক মিল সংখ্যা নির্বাচন করুন!');
   await sbClient.from('requests').insert([{type:'meal', user_id:profile.id, user_name:profile.name, month:activeMonth, date, action, count, status:'pending', ts:Date.now()}]);
@@ -672,6 +673,7 @@ async function submitMealRequest(){
 }
 
 async function submitBazaarRequest(){
+  if(!profile) return;
   const date=document.getElementById('rbDate').value, itemId=parseInt(document.getElementById('rbItem').value);
   const qty=parseFloat(document.getElementById('rbQty').value), price=parseFloat(document.getElementById('rbPrice').value);
   if(!date||!itemId||!qty||!price) return swalErr('সকল ইনপুট ফিল্ড সঠিকভাবে পূরণ করুন!');
@@ -684,6 +686,7 @@ async function submitBazaarRequest(){
 }
 
 async function markAllRead(){
+  if(!profile) return;
   await sbClient.from('notifications').update({is_read:true}).eq('user_id',profile.id);
   swalOk('সব নোটিফিকেশন রিড হিসেবে চিহ্নিত করা হয়েছে');
 }
@@ -714,17 +717,20 @@ if(sbClient){
       } else {
         const name = currentUser.user_metadata?.name || 'নতুন সদস্য';
         const {count} = await sbClient.from('users').select('*',{count:'exact',head:true});
-        const role = (count === 0 || count === null) ? 'manager' : 'member';
-        await sbClient.from('users').insert([{name, email:currentUser.email, role}]);
-        const {data: d2} = await sbClient.from('users').select('*').eq('email', currentUser.email).maybeSingle();
-        profile = d2;
+        const role = (!count || count === 0) ? 'manager' : 'member';
+        
+        const {data: newUser, error} = await sbClient.from('users').insert([{name, email:currentUser.email, role}]).select().single();
+        if(newUser) profile = newUser;
+        else profile = { name, email:currentUser.email, role };
       }
       
-      document.getElementById('userName').textContent = profile.name + (profile.role==='manager'?' (ম্যানেজার)':'');
-      setupRealtime();
-      showScreen(profile.role==='manager' ? 'managerScreen' : 'memberScreen');
-      showTab(profile.role, 'dash');
-      await loadAll();
+      if(profile && profile.name){
+        document.getElementById('userName').textContent = profile.name + (profile.role==='manager'?' (ম্যানেজার)':'');
+        setupRealtime();
+        showScreen(profile.role==='manager' ? 'managerScreen' : 'memberScreen');
+        showTab(profile.role, 'dash');
+        await loadAll();
+      }
     } else {
       currentUser=null; profile=null; cleanupRealtime();
       document.getElementById('userName').textContent='';
