@@ -8,10 +8,11 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
+  .screen{display:none}
   body{font-family:"Hind Siliguri",sans-serif;background:#f0f4f0}
   .fade{animation:fadeIn .3s ease}
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
@@ -34,6 +35,11 @@
 </style>
 </head>
 <body class="pb-16 md:pb-6">
+
+<!-- এরর মেসেজ (লাইব্রেরি লোড না হলে দেখাবে) -->
+<div id="jsError" class="hidden bg-red-600 text-white text-center py-3 text-sm font-bold">
+  ⚠️ কিছু একটা সমস্যা হচ্ছে — ইন্টারনেট চেক করে পেজ রিফ্রেশ করুন
+</div>
 
 <!-- হেডার -->
 <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg sticky top-0 z-40">
@@ -209,7 +215,15 @@
 /* ===== Supabase ===== */
 const SUPABASE_URL = 'https://tnkauduohjafnezlojtc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRua2F1ZHVvaGphZm5lemxvanRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4Mjk4NjMsImV4cCI6MjEwMjQwNTg2M30.4Ii96NvRWYDkISroXCOHmrBU3JjaVBnchR1Mg0B6PPU';
+
+// লাইব্রেরি ঠিকমতো লোড হয়েছে কি না চেক
+if (!window.supabase || !window.supabase.createClient) {
+  document.getElementById('jsError').classList.remove('hidden');
+  document.getElementById('jsError').textContent = '⚠️ Supabase লাইব্রেরি লোড হয়নি! ইন্টারনেট চেক করে রিফ্রেশ করুন।';
+  throw new Error('Supabase library not loaded');
+}
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+console.log('✅ Supabase ready');
 
 let currentUser = null, profile = null, channel = null, chart = null;
 let activeMonth = '', viewMonth = '';
@@ -392,7 +406,6 @@ function renderMyRequests(){
 function renderNotifications(){
   const el = document.getElementById('notifList');
   if(!DB.notifications.length){ el.innerHTML='<p class="text-gray-400">কোনো নোটিফিকেশন নেই</p>'; return; }
-  const unread = DB.notifications.filter(n=>!n.is_read).length;
   el.innerHTML = DB.notifications.map(n=>
     `<div class="border-l-4 ${n.is_read?'border-gray-300':'border-emerald-500'} bg-gray-50 rounded-r-xl p-3 mb-2"><b>🔔</b> ${n.message}<br><span class="text-xs text-gray-400">${new Date(n.ts).toLocaleString('bn-BD')}</span></div>`).join('');
   renderNav(profile.role);
@@ -402,11 +415,13 @@ function renderNotifications(){
 async function handleSignup(){
   const name=document.getElementById('suName').value.trim(), email=document.getElementById('suEmail').value.trim(), pass=document.getElementById('suPass').value;
   if(!name||!email||pass.length<6) return swalErr('নাম, ইমেইল আর মিন ৬ অক্ষরের পাসওয়ার্ড দিন!');
-  const {error} = await supabase.auth.signUp({ email, password:pass, options:{ data:{ name } } });
+  const {data, error} = await supabase.auth.signUp({ email, password:pass, options:{ data:{ name } } });
   if(error) return swalErr(error.message);
+  console.log('✅ SignUp OK:', data);
   const {count} = await supabase.from('users').select('*',{count:'exact',head:true});
   const role = count===0 ? 'manager':'member';
-  await supabase.from('users').insert([{name, email, role}]);
+  const {error: err2} = await supabase.from('users').insert([{name, email, role}]);
+  if(err2) console.log('⚠️ users insert error:', err2.message);
   swalOk(role==='manager' ? '🎉 আপনি ম্যানেজার হয়ে গেছেন!' : '✅ অ্যাকাউন্ট হয়েছে!');
 }
 async function handleLogin(){
@@ -548,6 +563,7 @@ supabase.auth.onAuthStateChange(async (event, session)=>{
   }
 });
 
+/* শুরুতে শুধু লগইন/সাইন আপ স্ক্রিন দেখাও */
 showScreen('authScreen');
 </script>
 </body>
