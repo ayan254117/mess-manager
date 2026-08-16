@@ -1,1 +1,784 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#059669">
+<title>🍽️ মেস মিল ম্যানেজার</title>
+<!-- Tailwind CSS & FontAwesome -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
+<!-- Supabase, SweetAlert2, Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+  :root {
+    --primary: #059669;
+  }
+  body {
+    font-family: "Hind Siliguri", sans-serif;
+    background-color: #f3f4f6;
+    color: #1f2937;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fade-in {
+    animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 0.75rem;
+  }
+  .table-wrap table {
+    min-width: 600px;
+    white-space: nowrap;
+  }
+  .tap-target {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s ease, opacity 0.1s ease;
+  }
+  .tap-target:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+  #bottomNav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid #e5e7eb;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #bottomNav button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 0;
+    font-size: 11px;
+    color: #6b7280;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  #bottomNav button.active {
+    color: #059669;
+    font-weight: 700;
+  }
+  #bottomNav button i {
+    font-size: 18px;
+  }
+
+  /* Dark Mode Enhancements */
+  @media (prefers-color-scheme: dark) {
+    body { background-color: #111827; color: #f9fafb; }
+    .bg-white { background-color: #1f2937 !important; color: #f9fafb !important; }
+    #bottomNav { background: rgba(31, 41, 55, 0.95); border-top-color: #374151; }
+    #bottomNav button { color: #9ca3af; }
+    #bottomNav button.active { color: #34d399; }
+    .bg-gray-50 { background-color: #374151 !important; }
+    .bg-emerald-50 { background-color: #064e3b !important; }
+    .bg-blue-50 { background-color: #1e3a8a !important; }
+    .text-gray-500 { color: #9ca3af !important; }
+    input, select {
+      background-color: #374151 !important;
+      border-color: #4b5563 !important;
+      color: #f9fafb !important;
+    }
+    .border { border-color: #374151 !important; }
+  }
+</style>
+</head>
+<body class="pb-24 md:pb-8">
+
+<!-- হেডার -->
+<header class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md sticky top-0 z-40">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+    <h1 class="text-lg md:text-xl font-bold flex items-center gap-2">
+      <span>🍽️</span> <span>মেস মিল ম্যানেজার</span>
+    </h1>
+    <div class="flex items-center gap-2 shrink-0">
+      <span id="userName" class="hidden sm:inline bg-white/20 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm"></span>
+      <button onclick="logout()" class="bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded-full px-3 py-1.5 text-xs font-semibold tap-target">
+        <i class="fa-solid fa-right-from-bracket mr-1"></i> লগআউট
+      </button>
+    </div>
+  </div>
+  <nav id="deskNav" class="hidden md:flex max-w-5xl mx-auto px-4 pb-2 gap-2 flex-wrap"></nav>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 py-6">
+
+  <!-- লগইন / সাইন আপ স্ক্রিন -->
+  <div id="authScreen" class="screen max-w-md mx-auto space-y-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 fade-in">
+      <h2 class="text-xl font-bold text-emerald-600 mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-lock text-sm"></i> লগইন করুন
+      </h2>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">ইমেইল</label>
+          <input id="liEmail" type="email" placeholder="example@gmail.com" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">পাসওয়ার্ড</label>
+          <input id="liPass" type="password" placeholder="••••••••" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <button onclick="handleLogin()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl tap-target text-sm mt-2 shadow-sm">
+          লগইন
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 fade-in">
+      <h2 class="text-xl font-bold text-blue-600 mb-1 flex items-center gap-2">
+        <i class="fa-solid fa-user-plus text-sm"></i> নতুন সাইন আপ
+      </h2>
+      <p class="text-xs text-gray-500 mb-4">প্রথম নিবন্ধিত ব্যবহারকারী স্বয়ংক্রিয়ভাবে <b>ম্যানেজার</b> হবেন।</p>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">আপনার নাম</label>
+          <input id="suName" type="text" placeholder="মোঃ এরফান" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">ইমেইল ঠিকানা</label>
+          <input id="suEmail" type="email" placeholder="example@gmail.com" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">পাসওয়ার্ড (ন্যূনতম ৬ অক্ষর)</label>
+          <input id="suPass" type="password" placeholder="••••••••" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <button onclick="handleSignup()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl tap-target text-sm mt-2 shadow-sm">
+          সাইন আপ করুন
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ম্যানেজার প্যানেল -->
+  <div id="managerScreen" class="screen space-y-4 hidden">
+    <!-- ড্যাশবোর্ড -->
+    <div id="mgDash" class="tab-content">
+      <div class="bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+          <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-chart-pie text-emerald-600"></i> ড্যাশবোর্ড ওভারভিউ</h2>
+          <div class="flex items-center gap-2">
+            <select id="monthSel" onchange="viewMonth=this.value; renderAll();" class="border rounded-xl px-3 py-1.5 bg-gray-50 text-sm font-medium focus:outline-none"></select>
+            <button onclick="startNewMonth()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl tap-target shadow-sm">
+              <i class="fa-solid fa-calendar-plus mr-1"></i> নতুন মাস
+            </button>
+          </div>
+        </div>
+        <div id="dashStats" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+        <div class="mt-6 h-64 relative"><canvas id="dashChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ক্যাটালগ -->
+    <div id="mgCatalog" class="tab-content hidden">
+      <div class="bg-white rounded-2xl shadow-sm border p-5 mb-4 fade-in space-y-3">
+        <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-plus-circle text-emerald-600"></i> নতুন বাজার আইটেম</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input id="ciName" class="border rounded-xl px-4 py-2.5 bg-gray-50 text-sm" placeholder="আইটেমের নাম (যেমন: চাল)">
+          <input id="ciUnit" class="border rounded-xl px-4 py-2.5 bg-gray-50 text-sm" placeholder="একক (যেমন: কেজি)">
+        </div>
+        <button onclick="addCatalogItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl tap-target shadow-sm">
+          + আইটেম যোগ করুন
+        </button>
+      </div>
+      <div class="bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-boxes-stacked text-emerald-600"></i> ক্যাটালগ তালিকা</h2>
+        <div class="table-wrap">
+          <table class="w-full text-sm text-left">
+            <thead>
+              <tr class="bg-emerald-600 text-white"><th class="p-3">আইটেম</th><th class="p-3">একক</th><th class="p-3 text-right">একশন</th></tr>
+            </thead>
+            <tbody id="catalogTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- পেন্ডিং রিকোয়েস্ট -->
+    <div id="mgPending" class="tab-content hidden">
+      <div class="bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-clock text-amber-500"></i> পেন্ডিং রিকোয়েস্ট সমূহ</h2>
+        <div id="pendingList" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- সদস্য ও জমা -->
+    <div id="mgMembers" class="tab-content hidden">
+      <div class="bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-users text-emerald-600"></i> সদস্য ও ডিপোজিট ম্যানেজমেন্ট</h2>
+        <div class="table-wrap">
+          <table class="w-full text-sm text-left">
+            <thead>
+              <tr class="bg-emerald-600 text-white">
+                <th class="p-3">নাম</th><th class="p-3">ভূমিকা</th><th class="p-3">মোট মিল</th><th class="p-3">জমা পরিমাণ</th><th class="p-3">টাকা জমা নিন</th><th class="p-3 text-right">একশন</th>
+              </tr>
+            </thead>
+            <tbody id="membersTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- রিপোর্ট -->
+    <div id="mgReport" class="tab-content hidden">
+      <div class="bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-file-invoice-dollar text-emerald-600"></i> মাসিক পূর্ণাঙ্গ রিপোর্ট</h2>
+        <div id="rStats" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>
+        <div class="table-wrap">
+          <table class="w-full text-sm text-left">
+            <thead>
+              <tr class="bg-emerald-600 text-white"><th class="p-3">নাম</th><th class="p-3">মিল</th><th class="p-3">মোট খরচ</th><th class="p-3">মোট জমা</th><th class="p-3">স্ট্যাটাস (ব্যালেন্স)</th></tr>
+            </thead>
+            <tbody id="reportTbody"></tbody>
+          </table>
+        </div>
+        <button onclick="window.print()" class="mt-5 bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl tap-target shadow-sm text-sm">
+          <i class="fa-solid fa-print mr-1"></i> প্রিন্ট রিপোর্ট
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- সদস্য প্যানেল -->
+  <div id="memberScreen" class="screen space-y-4 hidden">
+    <!-- সদস্য ড্যাশবোর্ড -->
+    <div id="mbDash" class="tab-content">
+      <div class="bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-simple text-emerald-600"></i> মেসের বর্তমান অবস্থা</h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div class="bg-emerald-50 rounded-2xl p-4 text-center"><p class="text-xs text-gray-500 font-medium">মোট সদস্য</p><b id="mTotalMembers" class="text-xl md:text-2xl text-emerald-600">0</b></div>
+          <div class="bg-emerald-50 rounded-2xl p-4 text-center"><p class="text-xs text-gray-500 font-medium">মোট মেস মিল</p><b id="mTotalMeals" class="text-xl md:text-2xl text-emerald-600">0</b></div>
+          <div class="bg-emerald-50 rounded-2xl p-4 text-center"><p class="text-xs text-gray-500 font-medium">মোট বাজার খরচ</p><b id="mTotalBazaar" class="text-xl md:text-2xl text-emerald-600">0</b></div>
+          <div class="bg-emerald-50 rounded-2xl p-4 text-center"><p class="text-xs text-gray-500 font-medium">বর্তমান মিল রেট</p><b id="mMealRate" class="text-xl md:text-2xl text-emerald-600">0</b></div>
+          <div class="bg-blue-50 rounded-2xl p-4 text-center"><p class="text-xs font-semibold text-blue-600">আমার মোট মিল</p><b id="mMyMeals" class="text-xl md:text-2xl text-blue-600">0</b></div>
+          <div class="bg-blue-50 rounded-2xl p-4 text-center"><p class="text-xs font-semibold text-blue-600">আমার জমা টাকা</p><b id="mMyDeposit" class="text-xl md:text-2xl text-blue-600">0</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- মিল রিকোয়েস্ট -->
+    <div id="mbMeal" class="tab-content hidden">
+      <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border p-5 fade-in space-y-3">
+        <h2 class="text-lg font-bold mb-2 flex items-center gap-2"><i class="fa-solid fa-bowl-rice text-emerald-600"></i> মিল আপডেট রিকোয়েস্ট</h2>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">তারিখ</label>
+          <input id="rmDate" type="date" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">ধরণ</label>
+          <select id="rmAction" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm">
+            <option value="add">মিল যোগ করুন (+)</option>
+            <option value="pause">মিল বন্ধ করুন (−)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">মিল সংখ্যা</label>
+          <input id="rmCount" type="number" step="0.5" min="0.5" placeholder="যেমন: 1 বা 1.5" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm">
+        </div>
+        <button onclick="submitMealRequest()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl tap-target text-sm shadow-sm mt-2">
+          <i class="fa-paper-plane fa-solid mr-1"></i> রিকোয়েস্ট পাঠান
+        </button>
+      </div>
+    </div>
+
+    <!-- বাজার এনট্রি -->
+    <div id="mbBazaar" class="tab-content hidden">
+      <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border p-5 fade-in space-y-3">
+        <h2 class="text-lg font-bold mb-2 flex items-center gap-2"><i class="fa-solid fa-cart-shopping text-emerald-600"></i> বাজার খরচের হিসাব জমা</h2>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">তারিখ</label>
+          <input id="rbDate" type="date" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">আইটেম সিলেক্ট করুন</label>
+          <select id="rbItem" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm"></select>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">পরিমাণ</label>
+            <input id="rbQty" type="number" step="0.1" min="0.1" oninput="updateAutoTotal()" placeholder="যেমন: 5" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">একক মূল্য (টাকা)</label>
+            <input id="rbPrice" type="number" step="0.1" min="0.1" oninput="updateAutoTotal()" placeholder="যেমন: 70" class="w-full border rounded-xl px-4 py-2.5 bg-gray-50 text-sm">
+          </div>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-xl flex items-center justify-between border">
+          <span class="text-sm font-semibold text-gray-600">মোট হিসাব:</span>
+          <span id="rbTotal" class="font-bold text-emerald-600 text-lg">0.00 টাকা</span>
+        </div>
+        <button onclick="submitBazaarRequest()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl tap-target text-sm shadow-sm">
+          <i class="fa-paper-plane fa-solid mr-1"></i> রিকোয়েস্ট পাঠান
+        </button>
+      </div>
+    </div>
+
+    <!-- আমার রিকোয়েস্ট -->
+    <div id="mbMyreq" class="tab-content hidden">
+      <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <h2 class="text-lg font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-list-check text-emerald-600"></i> আমার রিকোয়েস্টের অবস্থা</h2>
+        <div id="myRequestsList" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- নোটিফিকেশন -->
+    <div id="mbNotif" class="tab-content hidden">
+      <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border p-5 fade-in">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-bell text-emerald-600"></i> নোটিফিকেশন</h2>
+          <button onclick="markAllRead()" class="bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-bold px-3 py-1.5 rounded-lg tap-target">
+            সব পঠিত চিহ্নিত করুন
+          </button>
+        </div>
+        <div id="notifList" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- মোবাইল বটম নেভিগেশন বার -->
+<div id="bottomNav" class="md:hidden">
+  <div class="max-w-md mx-auto flex justify-around" id="mobNav"></div>
+</div>
+
+<script>
+/* ===== Supabase Configuration ===== */
+const SUPABASE_URL = 'https://tnkauduohjafnezlojtc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRua2F1ZHVvaGphZm5lemxvanRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4Mjk4NjMsImV4cCI6MjEwMjQwNTg2M30.4Ii96NvRWYDkISroXCOHmrBU3JjaVBnchR1Mg0B6PPU';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null, profile = null, channel = null, chart = null;
+let activeMonth = '', viewMonth = '';
+const DB = { users:[], catalog:[], requests:[], meals:[], bazaar:[], deposits:[], notifications:[] };
+const settingsCache = {};
+
+const NAV = {
+  manager: [['dash','fa-chart-pie','ড্যাশবোর্ড'],['catalog','fa-box','ক্যাটালগ'],['pending','fa-clock','পেন্ডিং'],['members','fa-users','সদস্য'],['report','fa-file-lines','রিপোর্ট']],
+  member:  [['dash','fa-chart-pie','ড্যাশবোর্ড'],['meal','fa-bowl-food','মিল'],['bazaar','fa-cart-shopping','বাজার'],['myreq','fa-list-check','রিকোয়েস্ট'],['notif','fa-bell','নোটিফিকেশন']]
+};
+
+const currentTab = { manager:'dash', member:'dash' };
+
+/* ---------- হেল্পারস ---------- */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  const target = document.getElementById(id);
+  if(target) target.classList.remove('hidden');
+}
+
+function fmt(n){ return Number(n||0).toFixed(2); }
+function monthKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+function nextMonthKey(m){ const [y,mo]=m.split('-').map(Number); return monthKey(new Date(y,mo,1)); }
+function swalOk(t,x=''){ Swal.fire({icon:'success',title:t,text:x,toast:true,position:'top-end',timer:2200,showConfirmButton:false}); }
+function swalErr(t){ Swal.fire({icon:'error',title:t,toast:true,position:'top-end',timer:2500,showConfirmButton:false}); }
+
+function userMeals(uid,m){ return Math.max(0, DB.meals.filter(x=>x.user_id===uid&&x.month===m).reduce((s,x)=>s+(x.count||0),0)); }
+function totalMeals(m){ return Math.max(0, DB.meals.filter(x=>x.month===m).reduce((s,x)=>s+(x.count||0),0)); }
+function totalBazaar(m){ return DB.bazaar.filter(x=>x.month===m).reduce((s,x)=>s+(x.total_amount||0),0); }
+function rate(m){ const tm=totalMeals(m); return tm>0 ? totalBazaar(m)/tm : 0; }
+function depositFor(uid,m){ return DB.deposits.filter(x=>x.user_id===uid&&x.month===m).reduce((s,x)=>s+(x.amount||0),0); }
+
+/* ---------- ডেটা লোড ---------- */
+async function loadAll(){
+  if(!profile) return;
+  const [users,catalog,requests,meals,bazaar,deposits,settings,notifs] = await Promise.all([
+    supabase.from('users').select('*').order('id'),
+    supabase.from('catalog').select('*').order('id'),
+    supabase.from('requests').select('*').order('ts',{ascending:false}),
+    supabase.from('meals').select('*'),
+    supabase.from('bazaar').select('*'),
+    supabase.from('deposits').select('*'),
+    supabase.from('settings').select('*'),
+    supabase.from('notifications').select('*').eq('user_id', profile.id).order('ts',{ascending:false})
+  ]);
+
+  DB.users = users.data||[]; DB.catalog = catalog.data||[]; DB.requests = requests.data||[];
+  DB.meals = meals.data||[]; DB.bazaar = bazaar.data||[]; DB.deposits = deposits.data||[]; DB.notifications = notifs.data||[];
+
+  Object.keys(settingsCache).forEach(k=>delete settingsCache[k]);
+  (settings.data||[]).forEach(s=>settingsCache[s.key]=s.value);
+  activeMonth = settingsCache.current_month || monthKey(new Date());
+  if(!viewMonth) viewMonth = activeMonth;
+
+  renderAll();
+}
+
+/* ---------- রেন্ডারিং logic ---------- */
+function renderAll(){
+  if(!profile || !activeMonth) return;
+  if(profile.role==='manager'){
+    renderNav('manager'); renderMonthSel(); renderStats(); renderChart(); renderCatalog(); renderPending(); renderMembers(); renderReport();
+  } else {
+    renderNav('member'); renderMemberDash(); renderItemDropdown(); renderMyRequests(); renderNotifications();
+  }
+}
+
+function renderNav(role){
+  const items = NAV[role];
+  const active = currentTab[role] || 'dash';
+  document.getElementById('deskNav').innerHTML = items.map(([id,ic,label])=>
+    `<button onclick="showTab('${role}','${id}')" class="${id===active?'bg-white text-emerald-700 shadow-sm':'bg-white/10 hover:bg-white/20 text-white'} rounded-full px-4 py-1.5 text-xs font-semibold tap-target transition"><i class="fa-solid ${ic} mr-1.5"></i>${label}</button>`).join('');
+
+  document.getElementById('mobNav').innerHTML = items.map(([id,ic,label])=>
+    `<button onclick="showTab('${role}','${id}')" class="${id===active?'active':''}"><i class="fa-solid ${ic}"></i><span>${label}</span></button>`).join('');
+}
+
+function showTab(role, id){
+  currentTab[role] = id;
+  renderNav(role);
+  const panel = role==='manager' ? 'managerScreen' : 'memberScreen';
+  document.querySelectorAll('#'+panel+' .tab-content').forEach(c=>c.classList.add('hidden'));
+  const target = document.getElementById(role==='manager' ? 'mg'+id[0].toUpperCase()+id.slice(1) : 'mb'+id[0].toUpperCase()+id.slice(1));
+  if(target) target.classList.remove('hidden');
+}
+
+function renderMonthSel(){
+  const months = [...new Set([...DB.meals.map(x=>x.month),...DB.bazaar.map(x=>x.month),...DB.deposits.map(x=>x.month), activeMonth])].sort();
+  document.getElementById('monthSel').innerHTML = months.map(m=>`<option value="${m}" ${m===viewMonth?'selected':''}>📅 ${m}</option>`).join('');
+}
+
+function statCard(html){ return `<div class="bg-gray-50 border rounded-2xl p-4 text-center">${html}</div>`; }
+
+function renderStats(){
+  document.getElementById('dashStats').innerHTML =
+    statCard(`<p class="text-xs text-gray-500 font-medium">মোট মিল</p><b class="text-xl md:text-2xl text-emerald-600">${totalMeals(viewMonth)}</b>`) +
+    statCard(`<p class="text-xs text-gray-500 font-medium font-medium">মোট খরচ</p><b class="text-xl md:text-2xl text-amber-600">${fmt(totalBazaar(viewMonth))} ৳</b>`) +
+    statCard(`<p class="text-xs text-gray-500 font-medium">মিল রেট</p><b class="text-xl md:text-2xl text-blue-600">${fmt(rate(viewMonth))} ৳</b>`) +
+    statCard(`<p class="text-xs text-gray-500 font-medium">সদস্য</p><b class="text-xl md:text-2xl text-purple-600">${DB.users.length}</b>`);
+}
+
+function renderChart(){
+  const dB={}, dM={};
+  DB.bazaar.filter(b=>b.month===viewMonth).forEach(b=>{ if(b.date) dB[b.date]=(dB[b.date]||0)+(b.total_amount||0); });
+  DB.meals.filter(x=>x.month===viewMonth).forEach(x=>{ if(x.date) dM[x.date]=(dM[x.date]||0)+(x.count||0); });
+  const labels=[...new Set([...Object.keys(dB),...Object.keys(dM)])].sort();
+  
+  if(chart) chart.destroy();
+  const ctx = document.getElementById('dashChart');
+  if(!labels.length || !ctx) return;
+
+  chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'বাজার খরচ (টাকা)', data:labels.map(d=>dB[d]||0), backgroundColor:'rgba(5, 150, 105, 0.8)', borderRadius:6},
+        {label:'মিল সংখ্যা', data:labels.map(d=>dM[d]||0), backgroundColor:'rgba(37, 99, 235, 0.8)', borderRadius:6}
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+  });
+}
+
+function renderCatalog(){
+  document.getElementById('catalogTbody').innerHTML = DB.catalog.map(it=>
+    `<tr class="border-b"><td class="p-3 font-medium">${it.name}</td><td class="p-3 text-gray-500">${it.unit}</td><td class="p-3 text-right"><button onclick="deleteCatalogItem(${it.id})" class="bg-red-50 hover:bg-red-100 text-red-600 text-xs px-3 py-1.5 rounded-lg font-semibold tap-target"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+}
+
+function renderPending(){
+  const list = DB.requests.filter(r=>r.status==='pending');
+  const el = document.getElementById('pendingList');
+  if(!list.length){ el.innerHTML='<p class="text-gray-400 text-sm">কোনো পেন্ডিং রিকোয়েস্ট নেই ✅</p>'; return; }
+  el.innerHTML = list.map(r=>{
+    let d = r.type==='meal'
+      ? `🍚 <b>${r.user_name}</b> — ${r.action==='add'?'মিল যোগ':'মিল বন্ধ'} <b>${r.count}টি</b> (${r.date})`
+      : `🛒 <b>${r.user_name}</b> — বাজার (${r.date})<br><span class="text-xs text-gray-500">${(JSON.parse(r.items||'[]')).map(i=>`• ${i.name} ${i.qty}${i.unit} × ${i.price} = ${fmt(i.total)}৳`).join('<br>')}</span><br><b class="text-emerald-600 text-sm">মোট: ${fmt(r.total_amount)} টাকা</b>`;
+    return `<div class="border rounded-xl p-4 bg-gray-50 text-sm space-y-3">
+      <div>${d}</div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="approveRequest(${r.id})" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg tap-target"><i class="fa-solid fa-check"></i> অনুমোদন</button>
+        <button onclick="rejectRequest(${r.id})" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2 rounded-lg tap-target"><i class="fa-solid fa-xmark"></i> বাতিল</button>
+        <button onclick="deleteRequest(${r.id})" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg tap-target"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderMembers(){
+  document.getElementById('membersTbody').innerHTML = DB.users.map(u=>{
+    const roleBadge = u.role==='manager' ? '<span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold">ম্যানেজার</span>' : '<span class="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">সদস্য</span>';
+    return `<tr class="border-b">
+      <td class="p-3 font-medium">${u.name}</td><td class="p-3">${roleBadge}</td>
+      <td class="p-3 font-semibold text-emerald-600">${userMeals(u.id, viewMonth)}</td>
+      <td class="p-3 font-semibold">${fmt(depositFor(u.id, viewMonth))} ৳</td>
+      <td class="p-3">
+        <div class="flex gap-1">
+          <input id="dep${u.id}" type="number" step="0.01" class="border rounded-lg px-2 py-1 text-xs w-20 bg-gray-50" placeholder="টাকা">
+          <button onclick="addDeposit(${u.id})" class="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-lg tap-target"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </td>
+      <td class="p-3 text-right space-x-1">
+        <button onclick="toggleRole(${u.id},'${u.role==='manager'?'member':'manager'}')" title="ভূমিকা পরিবর্তন" class="bg-purple-50 text-purple-600 text-xs px-2.5 py-1.5 rounded-lg font-semibold tap-target"><i class="fa-solid fa-user-gear"></i></button>
+        <button onclick="removeMember(${u.id})" title="সদস্য মুছুন" class="bg-red-50 text-red-600 text-xs px-2.5 py-1.5 rounded-lg font-semibold tap-target"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderReport(){
+  const rateV = rate(viewMonth);
+  document.getElementById('rStats').innerHTML =
+    statCard(`<p class="text-xs text-gray-500 font-medium">মোট মিল</p><b class="text-xl text-emerald-600">${totalMeals(viewMonth)}</b>`) +
+    statCard(`<p class="text-xs text-gray-500 font-medium">মোট খরচ</p><b class="text-xl text-amber-600">${fmt(totalBazaar(viewMonth))} ৳</b>`) +
+    statCard(`<p class="text-xs text-gray-500 font-medium">মিল রেট</p><b class="text-xl text-blue-600">${fmt(rateV)} ৳</b>`) +
+    statCard(`<p class="text-xs text-gray-500 font-medium">সদস্য</p><b class="text-xl text-purple-600">${DB.users.length}</b>`);
+  
+  document.getElementById('reportTbody').innerHTML = DB.users.map(u=>{
+    const meals = userMeals(u.id, viewMonth), cost = meals*rateV, dep = depositFor(u.id, viewMonth), bal = dep-cost;
+    const st = bal>=0 ? `<span class="text-emerald-600 font-bold">+${fmt(bal)} (পাবে)</span>` : `<span class="text-red-500 font-bold">${fmt(bal)} (দেবে)</span>`;
+    return `<tr class="border-b"><td class="p-3 font-medium">${u.name}</td><td class="p-3">${meals}</td><td class="p-3">${fmt(cost)} ৳</td><td class="p-3">${fmt(dep)} ৳</td><td class="p-3">${st}</td></tr>`;
+  }).join('');
+}
+
+function renderMemberDash(){
+  document.getElementById('mTotalMembers').textContent = DB.users.length;
+  document.getElementById('mTotalMeals').textContent = totalMeals(activeMonth);
+  document.getElementById('mTotalBazaar').textContent = fmt(totalBazaar(activeMonth)) + ' ৳';
+  document.getElementById('mMealRate').textContent = fmt(rate(activeMonth)) + ' ৳';
+  document.getElementById('mMyMeals').textContent = userMeals(profile.id, activeMonth);
+  document.getElementById('mMyDeposit').textContent = fmt(depositFor(profile.id, activeMonth)) + ' ৳';
+}
+
+function renderItemDropdown(){
+  const sel = document.getElementById('rbItem');
+  sel.innerHTML = DB.catalog.length 
+    ? '<option value="">— আইটেম নির্বাচন করুন —</option>'+DB.catalog.map(it=>`<option value="${it.id}">${it.name} (${it.unit})</option>`).join('') 
+    : '<option value="">ক্যাটালগ খালি</option>';
+}
+
+function updateAutoTotal(){
+  const q = parseFloat(document.getElementById('rbQty').value)||0;
+  const p = parseFloat(document.getElementById('rbPrice').value)||0;
+  document.getElementById('rbTotal').textContent = fmt(q*p)+' টাকা';
+}
+
+function renderMyRequests(){
+  const mine = DB.requests.filter(r=>r.user_id===profile.id);
+  const el = document.getElementById('myRequestsList');
+  if(!mine.length){ el.innerHTML='<p class="text-gray-400 text-sm">কোনো রিকোয়েস্ট জমা নেই</p>'; return; }
+  const stBn = { pending:['অপেক্ষমাণ','bg-amber-500'], approved:['অনুমোদিত','bg-emerald-600'], rejected:['বাতিল','bg-red-500'] };
+  el.innerHTML = mine.map(r=>{
+    const [lb,cl]=stBn[r.status]||[r.status,'bg-gray-500'];
+    const txt = r.type==='meal' 
+      ? `🍚 ${r.action==='add'?'মিল যোগ':'মিল বন্ধ'} ${r.count}টি (${r.date})` 
+      : `🛒 বাজার ${fmt(r.total_amount)} টাকা (${r.date})`;
+    return `<div class="border rounded-xl p-3 bg-gray-50 text-sm flex items-center justify-between gap-2">
+      <span class="font-medium">${txt}</span>
+      <span class="text-white text-xs font-bold px-2.5 py-1 rounded-full ${cl}">${lb}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderNotifications(){
+  const el = document.getElementById('notifList');
+  if(!DB.notifications.length){ el.innerHTML='<p class="text-gray-400 text-sm">কোনো নোটিফিকেশন নেই</p>'; return; }
+  el.innerHTML = DB.notifications.map(n=>
+    `<div class="border-l-4 ${n.is_read?'border-gray-300':'border-emerald-500'} bg-gray-50 rounded-r-xl p-3 text-sm space-y-1">
+      <div>${n.message}</div>
+      <div class="text-xs text-gray-400">${new Date(n.ts).toLocaleString('bn-BD')}</div>
+    </div>`).join('');
+}
+
+/* ---------- অথেন্টিক্যাশন অ্যাকশন ---------- */
+async function handleSignup(){
+  const name=document.getElementById('suName').value.trim();
+  const email=document.getElementById('suEmail').value.trim();
+  const pass=document.getElementById('suPass').value;
+  if(!name||!email||pass.length<6) return swalErr('সঠিক নাম, ইমেইল এবং ন্যূনতম ৬ অক্ষরের পাসওয়ার্ড দিন!');
+  
+  const {error} = await supabase.auth.signUp({ email, password:pass, options:{ data:{ name } } });
+  if(error) return swalErr(error.message);
+  
+  swalOk('অ্যাকাউন্ট তৈরি সফল হয়েছে!');
+}
+
+async function handleLogin(){
+  const email = document.getElementById('liEmail').value.trim();
+  const password = document.getElementById('liPass').value;
+  if(!email || !password) return swalErr('ইমেইল ও পাসওয়ার্ড দিন');
+  
+  const {error} = await supabase.auth.signInWithPassword({ email, password });
+  if(error) swalErr(error.message);
+}
+
+async function logout(){ await supabase.auth.signOut(); }
+
+/* ---------- ম্যানেজার অ্যাকশন ---------- */
+async function addCatalogItem(){
+  const name=document.getElementById('ciName').value.trim(), unit=document.getElementById('ciUnit').value.trim();
+  if(!name||!unit) return swalErr('নাম ও একক উভয়ই প্রদান করুন!');
+  const {error} = await supabase.from('catalog').insert([{name, unit}]);
+  if(error) return swalErr(error.message);
+  document.getElementById('ciName').value=''; document.getElementById('ciUnit').value='';
+  await notifyAll('📦 নতুন বাজার আইটেম যুক্ত হয়েছে: '+name+' ('+unit+')');
+  swalOk('আইটেম সফলভাবে যোগ হয়েছে!');
+}
+
+async function deleteCatalogItem(id){
+  const r = await Swal.fire({title:'আইটেমটি মুছবেন?',icon:'warning',showCancelButton:true,confirmButtonText:'হ্যাঁ',cancelButtonText:'না'});
+  if(!r.isConfirmed) return;
+  await supabase.from('catalog').delete().eq('id',id);
+}
+
+async function approveRequest(id){
+  const r = DB.requests.find(x=>x.id===id);
+  if(!r||r.status!=='pending') return swalErr('অনুরোধটি বর্তমানে পেন্ডিং নেই!');
+  
+  await supabase.from('requests').update({status:'approved'}).eq('id',id);
+  if(r.type==='meal'){
+    const cnt = r.action==='pause' ? -(r.count) : r.count;
+    await supabase.from('meals').insert([{user_id:r.user_id, month:r.month, date:r.date, count:cnt}]);
+  } else {
+    await supabase.from('bazaar').insert([{user_id:r.user_id, user_name:r.user_name, month:r.month, date:r.date, total_amount:r.total_amount, items:r.items, ts:Date.now()}]);
+  }
+  
+  const msg = '✅ আপনার রিকোয়েস্ট অনুমোদিত হয়েছে' + (r.type==='meal' ? ` (${r.action==='add'?'মিল যোগ ':'মিল বন্ধ '}${Math.abs(r.count)}টি — ${r.date})` : ` (বাজার ${fmt(r.total_amount)}৳ — ${r.date})`);
+  await supabase.from('notifications').insert([{user_id:r.user_id, message:msg, ts:Date.now()}]);
+  swalOk('অনুমোদন প্রদান করা হয়েছে!');
+}
+
+async function rejectRequest(id){
+  const r = DB.requests.find(x=>x.id===id);
+  if(!r||r.status!=='pending') return swalErr('অনুরোধটি বর্তমানে পেন্ডিং নেই!');
+  await supabase.from('requests').update({status:'rejected'}).eq('id',id);
+  await supabase.from('notifications').insert([{user_id:r.user_id, message:'❌ আপনার রিকোয়েস্ট বাতিল করা হয়েছে ('+r.date+')', ts:Date.now()}]);
+  swalOk('রিকোয়েস্ট বাতিল করা হয়েছে');
+}
+
+async function deleteRequest(id){
+  const r = await Swal.fire({title:'রিকোয়েস্টটি মুছে ফেলতে চান?',icon:'warning',showCancelButton:true,confirmButtonText:'হ্যাঁ',cancelButtonText:'না'});
+  if(!r.isConfirmed) return;
+  await supabase.from('requests').delete().eq('id',id);
+}
+
+async function addDeposit(uid){
+  const input = document.getElementById('dep'+uid);
+  const val = parseFloat(input.value);
+  if(!val||val<=0) return swalErr('সঠিক টাকার পরিমাণ দিন!');
+  await supabase.from('deposits').insert([{user_id:uid, month:activeMonth, amount:val, ts:Date.now()}]);
+  input.value='';
+  await supabase.from('notifications').insert([{user_id:uid, message:'💰 আপনার অ্যাকাউন্টে '+fmt(val)+' টাকা জমা যোগ করা হয়েছে।', ts:Date.now()}]);
+  swalOk('টাকা জমা হয়েছে!');
+}
+
+async function toggleRole(uid, role){
+  await supabase.from('users').update({role}).eq('id',uid);
+  await notifyAll('🔄 ব্যবহারকারীর ভূমিকা পরিবর্তন করা হয়েছে।');
+}
+
+async function removeMember(uid){
+  const r = await Swal.fire({title:'সদস্যকে মুছে ফেলবেন?',text:'এর ফলে ব্যবহারকারীর সমস্ত রেকর্ড মুছে যেতে পারে!',icon:'warning',showCancelButton:true,confirmButtonText:'হ্যাঁ',cancelButtonText:'না'});
+  if(!r.isConfirmed) return;
+  await supabase.from('users').delete().eq('id',uid);
+}
+
+async function startNewMonth(){
+  const r = await Swal.fire({title:'নতুন হিসাব মাস শুরু করবেন?',text:'পূর্ববর্তী মাসের সকল রেকর্ড সংরক্ষিত থাকবে।',icon:'question',showCancelButton:true,confirmButtonText:'হ্যাঁ, শুরু করুন',cancelButtonText:'না'});
+  if(!r.isConfirmed) return;
+  const nm = nextMonthKey(activeMonth);
+  const existing = await supabase.from('settings').select('*').eq('key','current_month').maybeSingle();
+  if(existing.data) await supabase.from('settings').update({value:nm}).eq('key','current_month');
+  else await supabase.from('settings').insert([{key:'current_month', value:nm}]);
+  viewMonth = nm;
+  await notifyAll('📅 নতুন হিসাবের মাস চালু হয়েছে: '+nm);
+  swalOk('নতুন মাস শুরু হয়েছে!', nm);
+}
+
+/* ---------- সদস্য অ্যাকশন ---------- */
+async function submitMealRequest(){
+  const date=document.getElementById('rmDate').value, action=document.getElementById('rmAction').value, count=parseFloat(document.getElementById('rmCount').value);
+  if(!date||!count||count<=0) return swalErr('তারিখ ও সঠিক মিল সংখ্যা নির্বাচন করুন!');
+  await supabase.from('requests').insert([{type:'meal', user_id:profile.id, user_name:profile.name, month:activeMonth, date, action, count, status:'pending', ts:Date.now()}]);
+  document.getElementById('rmCount').value='';
+  swalOk('রিকোয়েস্ট পাঠানো হয়েছে!','ম্যানেজারের অনুমোদনের পর আপডেট হবে।');
+}
+
+async function submitBazaarRequest(){
+  const date=document.getElementById('rbDate').value, itemId=parseInt(document.getElementById('rbItem').value);
+  const qty=parseFloat(document.getElementById('rbQty').value), price=parseFloat(document.getElementById('rbPrice').value);
+  if(!date||!itemId||!qty||!price) return swalErr('সকল ইনপুট ফিল্ড সঠিকভাবে পূরণ করুন!');
+  const item = DB.catalog.find(x=>x.id===itemId);
+  const total = qty*price;
+  const items = JSON.stringify([{name:item.name, unit:item.unit, qty, price, total}]);
+  await supabase.from('requests').insert([{type:'bazaar', user_id:profile.id, user_name:profile.name, month:activeMonth, date, items, total_amount:total, status:'pending', ts:Date.now()}]);
+  document.getElementById('rbQty').value=''; document.getElementById('rbPrice').value=''; updateAutoTotal();
+  swalOk('বাজার খরচের আবেদন পাঠানো হয়েছে!');
+}
+
+async function markAllRead(){
+  await supabase.from('notifications').update({is_read:true}).eq('user_id',profile.id);
+  swalOk('সব নোটিফিকেশন রিড হিসেবে চিহ্নিত করা হয়েছে');
+}
+
+async function notifyAll(msg){
+  const {data} = await supabase.from('users').select('id');
+  if(!data) return;
+  await supabase.from('notifications').insert(data.map(u=>({user_id:u.id, message:msg, ts:Date.now()})));
+}
+
+/* ---------- রিয়েলটাইম লিসেনার ---------- */
+function setupRealtime(){
+  if(channel) channel.unsubscribe();
+  channel = supabase.channel('public-db-changes')
+    .on('postgres_changes', {event:'*', schema:'public'}, ()=>{ if(profile) loadAll(); })
+    .subscribe();
+}
+
+function cleanupRealtime(){ if(channel){ channel.unsubscribe(); channel=null; } }
+
+/* ---------- অথ স্টেট লিসেনার ---------- */
+supabase.auth.onAuthStateChange(async (event, session)=>{
+  if(session){
+    currentUser = session.user;
+    const {data} = await supabase.from('users').select('*').eq('email', currentUser.email).maybeSingle();
+    if(data){ 
+      profile = data; 
+    } else {
+      const name = currentUser.user_metadata?.name || 'নতুন সদস্য';
+      const {count} = await supabase.from('users').select('*',{count:'exact',head:true});
+      const role = (count === 0 || count === null) ? 'manager' : 'member';
+      await supabase.from('users').insert([{name, email:currentUser.email, role}]);
+      const {data: d2} = await supabase.from('users').select('*').eq('email', currentUser.email).maybeSingle();
+      profile = d2;
+    }
+    
+    document.getElementById('userName').textContent = profile.name + (profile.role==='manager'?' (ম্যানেজার)':'');
+    setupRealtime();
+    showScreen(profile.role==='manager' ? 'managerScreen' : 'memberScreen');
+    showTab(profile.role, 'dash');
+    await loadAll();
+  } else {
+    currentUser=null; profile=null; cleanupRealtime();
+    document.getElementById('userName').textContent='';
+    showScreen('authScreen');
+  }
+});
+
+// ইনিশিয়াল স্ক্রিন
+showScreen('authScreen');
+</script>
+</body>
+</html>
