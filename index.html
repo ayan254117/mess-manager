@@ -180,6 +180,16 @@
         <div id="myRequestsList"></div>
       </div>
     </div>
+    <div id="mbReport" class="tab-content hidden">
+      <div class="bg-white rounded-2xl shadow p-5 fade">
+        <h2 class="text-lg font-bold mb-3">📑 মাসিক রিপোর্ট (শুধু দেখা)</h2>
+        <div id="mrStats" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+        <div class="table-wrap"><table class="w-full text-sm">
+          <thead><tr class="bg-emerald-600 text-white"><th class="p-2">নাম</th><th class="p-2">মিল</th><th class="p-2">খরচ</th><th class="p-2">জমা</th><th class="p-2">ব্যালেন্স</th></tr></thead>
+          <tbody id="mrTbody"></tbody>
+        </table></div>
+      </div>
+    </div>
     <div id="mbNotif" class="tab-content hidden">
       <div class="max-w-xl mx-auto bg-white rounded-2xl shadow p-5 fade">
         <div class="flex items-center justify-between mb-3">
@@ -208,7 +218,7 @@ const settingsCache = {};
 
 const NAV = {
   manager: [['dash','fa-chart-pie','ড্যাশবোর্ড'],['catalog','fa-box','ক্যাটালগ'],['pending','fa-clock','পেন্ডিং'],['members','fa-users','সদস্য'],['report','fa-file-lines','রিপোর্ট']],
-  member:  [['dash','fa-chart-pie','ড্যাশবোর্ড'],['meal','fa-bowl-food','মিল'],['bazaar','fa-cart-shopping','বাজার'],['myreq','fa-list-check','রিকোয়েস্ট'],['notif','fa-bell','নোটিফিকেশন']]
+  member:  [['dash','fa-chart-pie','ড্যাশবোর্ড'],['meal','fa-bowl-food','মিল'],['bazaar','fa-cart-shopping','বাজার'],['myreq','fa-list-check','রিকোয়েস্ট'],['report','fa-file-lines','রিপোর্ট'],['notif','fa-bell','নোটিফিকেশন']]
 };
 
 /* ---------- হেল্পার ---------- */
@@ -250,7 +260,7 @@ async function loadAll(){
 function renderAll(){
   if(!profile || !activeMonth) return;
   if(profile.role==='manager'){ renderNav('manager'); renderMonthSel(); renderStats(); renderChart(); renderCatalog(); renderPending(); renderMembers(); renderReport(); }
-  else { renderNav('member'); renderMemberDash(); renderItemDropdown(); renderMyRequests(); renderNotifications(); }
+  else { renderNav('member'); renderMemberDash(); renderItemDropdown(); renderMyRequests(); renderNotifications(); renderMemberReport(); }
 }
 function renderNav(role){
   const items = NAV[role];
@@ -347,6 +357,19 @@ function renderMemberDash(){
   document.getElementById('mMyMeals').textContent = userMeals(profile.id, activeMonth);
   document.getElementById('mMyDeposit').textContent = fmt(depositFor(profile.id, activeMonth)) + ' টাকা';
 }
+function renderMemberReport(){
+  const m = activeMonth, rateV = rate(m);
+  document.getElementById('mrStats').innerHTML =
+    `<div class="bg-emerald-50 rounded-xl p-4 text-center"><p class="text-sm text-gray-500">মোট মিল</p><b class="text-2xl text-emerald-600">${totalMeals(m)}</b></div>` +
+    `<div class="bg-orange-50 rounded-xl p-4 text-center"><p class="text-sm text-gray-500">মোট খরচ</p><b class="text-2xl text-orange-600">${fmt(totalBazaar(m))} টাকা</b></div>` +
+    `<div class="bg-blue-50 rounded-xl p-4 text-center"><p class="text-sm text-gray-500">মিল রেট</p><b class="text-2xl text-blue-600">${fmt(rateV)} টাকা</b></div>` +
+    `<div class="bg-purple-50 rounded-xl p-4 text-center"><p class="text-sm text-gray-500">সদস্য</p><b class="text-2xl text-purple-600">${DB.users.length}</b></div>`;
+  document.getElementById('mrTbody').innerHTML = DB.users.map(u=>{
+    const meals = userMeals(u.id, m), cost = meals*rateV, dep = depositFor(u.id, m), bal = dep-cost;
+    const st = bal>=0 ? `<span class="text-emerald-600 font-bold">+${fmt(bal)} (ফেরত)</span>` : `<span class="text-red-500 font-bold">${fmt(bal)} (বাকি)</span>`;
+    return `<tr class="border-b"><td class="p-2">${u.name}</td><td class="p-2">${meals}</td><td class="p-2">${fmt(cost)} টাকা</td><td class="p-2">${fmt(dep)} টাকা</td><td class="p-2">${st}</td></tr>`;
+  }).join('');
+}
 function renderItemDropdown(){
   const sel = document.getElementById('rbItem');
   sel.innerHTML = DB.catalog.length ? '<option value="">— আইটেম নির্বাচন করুন —</option>'+DB.catalog.map(it=>`<option value="${it.id}">${it.name} (${it.unit})</option>`).join('') : '<option value="">ক্যাটালগ খালি</option>';
@@ -372,7 +395,6 @@ function renderNotifications(){
   const unread = DB.notifications.filter(n=>!n.is_read).length;
   el.innerHTML = DB.notifications.map(n=>
     `<div class="border-l-4 ${n.is_read?'border-gray-300':'border-emerald-500'} bg-gray-50 rounded-r-xl p-3 mb-2"><b>🔔</b> ${n.message}<br><span class="text-xs text-gray-400">${new Date(n.ts).toLocaleString('bn-BD')}</span></div>`).join('');
-  document.getElementById('mobNav').innerHTML = document.getElementById('mobNav').innerHTML; // re-render badge handled in renderNav
   renderNav(profile.role);
 }
 
@@ -438,7 +460,6 @@ async function addDeposit(uid){
   if(!val||val<=0) return swalErr('টাকার পরিমাণ দিন!');
   await supabase.from('deposits').insert([{user_id:uid, month:activeMonth, amount:val, ts:Date.now()}]);
   document.getElementById('dep'+uid).value='';
-  const {data} = await supabase.from('users').select('name').eq('id',uid).single();
   await supabase.from('notifications').insert([{user_id:uid, message:'💰 ম্যানেজার '+fmt(val)+' টাকা জমা যোগ করেছেন।', ts:Date.now()}]);
   swalOk('জমা যোগ হয়েছে!','');
 }
