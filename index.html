@@ -120,7 +120,7 @@
       <h2 class="text-xl font-bold text-blue-600 mb-1 flex items-center gap-2">
         <i class="fa-solid fa-user-plus text-sm"></i> নতুন সাইন আপ
       </h2>
-      <p class="text-xs text-gray-500 mb-4">প্রথম নিবন্ধিত ব্যবহারকারী স্বয়ংক্রিয়ভাবে <b>ম্যানেজার</b> হবেন।</p>
+      <p class="text-xs text-gray-500 mb-4">প্রথম নিবন্ধিত ব্যবহারকারী স্বয়ংক্রিয়ভাবে <b>ম্যানেজার</b> হবেন। পরবর্তী সবাই সদস্য হবেন।</p>
       <div class="space-y-3">
         <div>
           <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">আপনার নাম</label>
@@ -716,16 +716,18 @@ if(sbClient){
         profile = data; 
       } else {
         const name = currentUser.user_metadata?.name || 'নতুন সদস্য';
-        const {count} = await sbClient.from('users').select('*',{count:'exact',head:true});
-        const role = (!count || count === 0) ? 'manager' : 'member';
         
-        const {data: newUser, error} = await sbClient.from('users').insert([{name, email:currentUser.email, role}]).select().single();
+        // বিদ্যমান ইউজারের তালিকা চেক করা
+        const {data: existingUsers} = await sbClient.from('users').select('id');
+        const role = (!existingUsers || existingUsers.length === 0) ? 'manager' : 'member';
+        
+        const {data: newUser} = await sbClient.from('users').insert([{name, email:currentUser.email, role}]).select().single();
         if(newUser) profile = newUser;
         else profile = { name, email:currentUser.email, role };
       }
       
       if(profile && profile.name){
-        document.getElementById('userName').textContent = profile.name + (profile.role==='manager'?' (ম্যানেজার)':'');
+        document.getElementById('userName').textContent = profile.name + (profile.role==='manager'?' (ম্যানেজার)':' (সদস্য)');
         setupRealtime();
         showScreen(profile.role==='manager' ? 'managerScreen' : 'memberScreen');
         showTab(profile.role, 'dash');
