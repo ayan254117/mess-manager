@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ultra Realistic Glass Auth System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Supabase JS Client library CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- Background Animated Liquid Blobs -->
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <div class="container" id="container">
+    
+    <!-- Sign Up Form -->
+    <div class="form-container sign-up-container">
+      <form id="signupForm" novalidate>
+        <h1>Create Account</h1>
+        <p class="subtitle">Join our community today</p>
+        
+        <div id="signupMessage" class="message-box"></div>
+
+        <div class="name-row">
+          <div class="input-group">
+            <i class="fas fa-user icon"></i>
+            <input type="text" id="firstName" placeholder="First Name" required>
+          </div>
+          <div class="input-group">
+            <i class="fas fa-user icon"></i>
+            <input type="text" id="lastName" placeholder="Last Name" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <i class="fas fa-envelope icon"></i>
+          <input type="email" id="signupEmail" placeholder="Email Address" required>
+        </div>
+
+        <!-- Password Field -->
+        <div class="input-group">
+          <i class="fas fa-lock icon"></i>
+          <input type="password" id="signupPassword" placeholder="Password" required>
+          <i class="fas fa-eye toggle-password" id="toggleSignupPassword"></i>
+        </div>
+
+        <div class="strength-meter"><div id="strengthBar"></div></div>
+        <div id="capsAlert" class="caps-alert"><i class="fas fa-exclamation-triangle"></i> Caps Lock is ON</div>
+
+        <div class="input-group">
+          <i class="fas fa-lock icon"></i>
+          <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+        </div>
+
+        <button type="submit" class="btn liquid-glass-btn" id="signupBtn">
+          <span>Sign Up</span> <i class="fas fa-arrow-right"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- Sign In Form -->
+    <div class="form-container sign-in-container">
+      <form id="signinForm" novalidate>
+        <h1>Sign In</h1>
+        <p class="subtitle">Welcome back! Please enter your details</p>
+        
+        <div id="signinMessage" class="message-box"></div>
+
+        <div class="input-group">
+          <i class="fas fa-envelope icon"></i>
+          <input type="email" id="signinEmail" placeholder="Email Address" required>
+        </div>
+
+        <div class="input-group">
+          <i class="fas fa-lock icon"></i>
+          <input type="password" id="signinPassword" placeholder="Password" required>
+          <i class="fas fa-eye toggle-password" id="toggleSigninPassword"></i>
+        </div>
+
+        <button type="submit" class="btn liquid-glass-btn" id="signinBtn">
+          <span>Sign In</span> <i class="fas fa-arrow-right"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- Overlay Panel -->
+    <div class="overlay-container">
+      <div class="overlay">
+        <div class="overlay-panel overlay-left">
+          <h1>Welcome Back!</h1>
+          <p>To keep connected with us please login with your personal info</p>
+          <button type="button" class="btn liquid-glass-btn ghost" id="signIn">Sign In</button>
+        </div>
+        <div class="overlay-panel overlay-right">
+          <h1>Hello, Friend!</h1>
+          <p>Enter your personal details and start journey with us</p>
+          <button type="button" class="btn liquid-glass-btn ghost" id="signUp">Sign Up</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
