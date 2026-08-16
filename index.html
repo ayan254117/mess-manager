@@ -711,20 +711,18 @@ if(sbClient){
   sbClient.auth.onAuthStateChange(async (event, session)=>{
     if(session){
       currentUser = session.user;
-      const {data} = await sbClient.from('users').select('*').eq('email', currentUser.email).maybeSingle();
-      if(data){ 
-        profile = data; 
-      } else {
-        const name = currentUser.user_metadata?.name || 'নতুন সদস্য';
-        
-        // বিদ্যমান ইউজারের তালিকা চেক করা
-        const {data: existingUsers} = await sbClient.from('users').select('id');
-        const role = (!existingUsers || existingUsers.length === 0) ? 'manager' : 'member';
-        
-        const {data: newUser} = await sbClient.from('users').insert([{name, email:currentUser.email, role}]).select().single();
-        if(newUser) profile = newUser;
-        else profile = { name, email:currentUser.email, role };
+      
+      // ডাটাবেজ থেকে প্রফাইল তথ্য আনা (ট্রিগার ইতিমধ্যে তৈরি করে ফেলেছে)
+      let { data } = await sbClient.from('users').select('*').eq('email', currentUser.email).maybeSingle();
+      
+      // যদি নেটওয়ার্ক ডিলে বা অন্য কোনো কারণে প্রোফাইল তাৎক্ষণিক না পাওয়া যায়
+      if(!data){
+        await new Promise(r => setTimeout(r, 1000));
+        const res = await sbClient.from('users').select('*').eq('email', currentUser.email).maybeSingle();
+        data = res.data;
       }
+      
+      profile = data;
       
       if(profile && profile.name){
         document.getElementById('userName').textContent = profile.name + (profile.role==='manager'?' (ম্যানেজার)':' (সদস্য)');
